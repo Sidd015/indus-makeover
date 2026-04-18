@@ -829,29 +829,77 @@
   <!-- Scripts -->
   <script>
     /* 
-      NEW CLIENT DATA STRUCTURE
-      extraImages: number of extra images they have.
-      Example: extraImages: 2 means you need to put files inside:
-      /images/extra/swetha_1.jpg
-      /images/extra/swetha_2.jpg
+      DYNAMIC GALLERY GENERATOR 
+      Automatically finds images in your GitHub repository!
     */
-    const clientsData = [
-      { id: 'swetha', name: 'Swetha', extraImages: 3 },
-      { id: 'priya', name: 'Priya', extraImages: 0 },
-      { id: 'anita', name: 'Anita', extraImages: 2 },
-      { id: 'padhu', name: 'Padhu', extraImages: 0 },
-      { id: 'prardhana', name: 'Prardhana', extraImages: 0 }
-    ];
+    const repoOwner = 'Sidd015';
+    const repoName = 'indus-makeover';
     
+    // Fallback data in case GitHub API rate limit is reached
+    const fallbackClients = [
+      { id: 'swetha', name: 'Swetha', extraImages: 3, ext: 'jpg' },
+      { id: 'priya', name: 'Priya', extraImages: 0, ext: 'jpg' },
+      { id: 'anita', name: 'Anita', extraImages: 2, ext: 'jpg' },
+      { id: 'padhu', name: 'Padhu', extraImages: 0, ext: 'jpg' },
+      { id: 'prardhana', name: 'Prardhana', extraImages: 0, ext: 'jpg' }
+    ];
+
+    async function loadGallery() {
+      try {
+        const afterUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/images/after?ref=master`;
+        const extraUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/images/extra?ref=master`;
+
+        const afterRes = await fetch(afterUrl);
+        if (!afterRes.ok) throw new Error('Could not fetch after images');
+        const afterFiles = await afterRes.json();
+
+        const extraRes = await fetch(extraUrl);
+        const extraFiles = extraRes.ok ? await extraRes.json() : [];
+
+        let dynamicClients = [];
+
+        afterFiles.forEach(file => {
+          if (file.name.endsWith('.jpg') || file.name.endsWith('.jpeg') || file.name.endsWith('.png')) {
+            const ext = file.name.split('.').pop();
+            const id = file.name.replace('.' + ext, '');
+            // Capitalize first letter for display name
+            const displayName = id.charAt(0).toUpperCase() + id.slice(1);
+
+            // Count how many files in "extra" folder start with "idname_"
+            let extraCount = 0;
+            extraFiles.forEach(ex => {
+              if (ex.name.startsWith(id + '_') && (ex.name.endsWith('.jpg') || ex.name.endsWith('.jpeg') || ex.name.endsWith('.png'))) {
+                 extraCount++;
+              }
+            });
+
+            dynamicClients.push({
+              id: id,
+              name: displayName,
+              extraImages: extraCount,
+              ext: ext
+            });
+          }
+        });
+
+        renderGallery(dynamicClients);
+      } catch (error) {
+        console.warn("Using fallback gallery data due to API limits or missing folders.");
+        renderGallery(fallbackClients);
+      }
+    }
+
     // Auto-generate gallery logic
     const galleryContainer = document.getElementById('gallery-container');
     
-    if (galleryContainer && clientsData.length > 0) {
+    function renderGallery(clientsData) {
+      if (!galleryContainer) return;
+      galleryContainer.innerHTML = ''; // clear
+
       clientsData.forEach(client => {
         let btnHTML = '';
-        // If client has extra images, show the "Show More" button
         if(client.extraImages > 0) {
-          btnHTML = `<button class="btn btn-outline" onclick="openModal('${client.id}', '${client.name}', ${client.extraImages})">Show More</button>`;
+          btnHTML = `<button class="btn btn-outline" onclick="openModal('${client.id}', '${client.name}', ${client.extraImages}, '${client.ext}')">Show More</button>`;
         }
 
         const cardHTML = `
@@ -859,13 +907,11 @@
             <div class="ba-images-wrapper">
               <div class="ba-image-container">
                 <div class="ba-label">Before</div>
-                <!-- BEFORE IMAGE -->
-                <img src="images/before/${client.id}.jpg" alt="Before - ${client.name}" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iNTAwIiB2aWV3Qm94PSIwIDAgNDAwIDUwMCI+PHJlY3Qgd2lkdGg9IjQwMCIgaGVpZ2h0PSI1MDAiIGZpbGw9IiNlMGRiZDIiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjQiIGZpbGw9IiMxYzE0MTAiIGR5PSIuM2VtIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5CZWZvcmU8L3RleHQ+PC9zdmc+'">
+                <img src="images/before/${client.id}.${client.ext}" alt="Before - ${client.name}" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iNTAwIiB2aWV3Qm94PSIwIDAgNDAwIDUwMCI+PHJlY3Qgd2lkdGg9IjQwMCIgaGVpZ2h0PSI1MDAiIGZpbGw9IiNlMGRiZDIiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjQiIGZpbGw9IiMxYzE0MTAiIGR5PSIuM2VtIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5CZWZvcmU8L3RleHQ+PC9zdmc+'" loading="lazy">
               </div>
               <div class="ba-image-container">
                 <div class="ba-label">After</div>
-                <!-- AFTER IMAGE -->
-                <img src="images/after/${client.id}.jpg" alt="After - ${client.name}" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iNTAwIiB2aWV3Qm94PSIwIDAgNDAwIDUwMCI+PHJlY3Qgd2lkdGg9IjQwMCIgaGVpZ2h0PSI1MDAiIGZpbGw9IiNmYWY1ZWYiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjQiIGZpbGw9IiMxYzE0MTAiIGR5PSIuM2VtIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5BZnRlcjwvdGV4dD48L3N2Zz+'">
+                <img src="images/after/${client.id}.${client.ext}" alt="After - ${client.name}" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iNTAwIiB2aWV3Qm94PSIwIDAgNDAwIDUwMCI+PHJlY3Qgd2lkdGg9IjQwMCIgaGVpZ2h0PSI1MDAiIGZpbGw9IiNmYWY1ZWYiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjQiIGZpbGw9IiMxYzE0MTAiIGR5PSIuM2VtIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5BZnRlcjwvdGV4dD48L3N2Zz+'" loading="lazy">
               </div>
             </div>
             <div class="ba-footer">
@@ -878,19 +924,21 @@
       });
     }
 
+    // Load dynamic gallery on page load
+    loadGallery();
+
     // Modal Logic
     const modal = document.getElementById('gallery-modal');
     const modalTitle = document.getElementById('modal-client-name');
     const modalGallery = document.getElementById('modal-gallery-grid');
 
-    function openModal(clientId, clientName, count) {
+    function openModal(clientId, clientName, count, ext) {
       modalTitle.textContent = clientName + "'s Lookbook";
-      modalGallery.innerHTML = ''; // clear old images
+      modalGallery.innerHTML = ''; 
       
-      // Load the extra images dynamically
       for(let i = 1; i <= count; i++) {
         modalGallery.innerHTML += `
-          <img src="images/extra/${clientId}_${i}.jpg" alt="${clientName} extra photo ${i}" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iNDAwIiB2aWV3Qm94PSIwIDAgNDAwIDQwMCI+PHJlY3Qgd2lkdGg9IjQwMCIgaGVpZ2h0PSI0MDAiIGZpbGw9IiNlY2QwOWYiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjAiIGZpbGw9IiMxYzE0MTAiIGR5PSIuM2VtIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5QaG90byAke2l9PC90ZXh0Pjwvc3ZnPg=='" />
+          <img src="images/extra/${clientId}_${i}.${ext}" alt="${clientName} extra photo ${i}" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iNDAwIiB2aWV3Qm94PSIwIDAgNDAwIDQwMCI+PHJlY3Qgd2lkdGg9IjQwMCIgaGVpZ2h0PSI0MDAiIGZpbGw9IiNlY2QwOWYiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjAiIGZpbGw9IiMxYzE0MTAiIGR5PSIuM2VtIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5QaG90byAke2l9PC90ZXh0Pjwvc3ZnPg=='" loading="lazy" />
         `;
       }
       modal.classList.add('active');
@@ -900,7 +948,6 @@
       modal.classList.remove('active');
     }
 
-    // Close modal if clicked outside of content
     window.onclick = function(event) {
       if (event.target == modal) {
         closeModal();
