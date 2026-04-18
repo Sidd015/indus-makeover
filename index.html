@@ -753,9 +753,10 @@
           <h2>Saree Pre-Pleating Service</h2>
           <p>Avoid the last-minute stress on your big day! We offer professional Saree Pre-Pleating services. We precisely fold, iron, and box your silk sarees in advance so you can drape them effortlessly in just 2 minutes on the event day.</p>
           <a href="https://wa.me/919346409665?text=Hello%20Indus%20Makeover!%20I%20am%20interested%20in%20your%20Saree%20Pre-Pleating%20service." target="_blank" class="btn btn-gold">Inquire Now</a>
+          <button id="saree-gallery-btn" class="btn btn-outline" style="display:none; margin-left:10px;">View Gallery</button>
         </div>
         <div class="saree-image">
-          <img src="images/saree-pleat.jpg" alt="Saree Pre-Pleating" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iNTUwIiB2aWV3Qm94PSIwIDAgNDAwIDU1MCI+PHJlY3Qgd2lkdGg9IjQwMCIgaGVpZ2h0PSI1NTAiIGZpbGw9IiMzMzMiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1mYW1pbHk9InNlcmlmIiBmb250LXNpemU9IjIwIiBmaWxsPSIjYjg4NzRhIiBkeT0iLjNlbSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+U2FyZWUgUHJlLXBsZWF0aW5nIEltYWdlPC90ZXh0Pjwvc3ZnPg=='">
+          <img id="saree-main-img" src="images/saree-pleat.jpg" alt="Saree Pre-Pleating" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iNTUwIiB2aWV3Qm94PSIwIDAgNDAwIDU1MCI+PHJlY3Qgd2lkdGg9IjQwMCIgaGVpZ2h0PSI1NTAiIGZpbGw9IiMzMzMiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1mYW1pbHk9InNlcmlmIiBmb250LXNpemU9IjIwIiBmaWxsPSIjYjg4NzRhIiBkeT0iLjNlbSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+U2FyZWUgUHJlLXBsZWF0aW5nIEltYWdlPC90ZXh0Pjwvc3ZnPg=='">
         </div>
       </div>
     </div>
@@ -869,27 +870,61 @@
             let clientExtraFiles = [];
             extraFiles.forEach(ex => {
               if (ex.name.startsWith(id + '_') && (ex.name.endsWith('.jpg') || ex.name.endsWith('.jpeg') || ex.name.endsWith('.png'))) {
-                 clientExtraFiles.push(ex.name);
+                 // Push full relative path so modal is path-agnostic
+                 clientExtraFiles.push(`extra/${ex.name}`);
               }
             });
 
             // Make sure they are sorted logically (1, 2, 3 instead of 1, 10, 2)
             clientExtraFiles.sort((a, b) => {
-              const numA = parseInt(a.replace(/^\D+/g, '')) || 0;
-              const numB = parseInt(b.replace(/^\D+/g, '')) || 0;
+              const numA = parseInt(a.match(/_(\d+)\./)?.[1] || a.replace(/^\D+/g, '')) || 0;
+              const numB = parseInt(b.match(/_(\d+)\./)?.[1] || b.replace(/^\D+/g, '')) || 0;
               return numA - numB;
             });
 
             dynamicClients.push({
               id: id,
               name: displayName,
-              extraImages: clientExtraFiles, // Now an array of exact filenames
+              extraImages: clientExtraFiles, // Now an array of exact paths
               ext: ext
             });
           }
         });
 
         renderGallery(dynamicClients);
+
+        /* SAREE DYNAMIC LOADING */
+        const sareeUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/images/saree?ref=master`;
+        const sareeRes = await fetch(sareeUrl);
+        const sareeFiles = sareeRes.ok ? await sareeRes.json() : [];
+        
+        let mainSareePath = ''; 
+        let extraSareeFiles = [];
+
+        sareeFiles.forEach(file => {
+          if (file.name.endsWith('.jpg') || file.name.endsWith('.jpeg') || file.name.endsWith('.png')) {
+            if (file.name.toLowerCase().startsWith('main')) {
+              mainSareePath = `images/saree/${file.name}`;
+            } else {
+              extraSareeFiles.push(`saree/${file.name}`);
+            }
+          }
+        });
+
+        // Update DOM for Main Saree Image
+        const sareeImgEl = document.getElementById('saree-main-img');
+        if (sareeImgEl && mainSareePath !== '') {
+           sareeImgEl.src = mainSareePath;
+        }
+
+        // Update DOM for Saree Gallery Button
+        const sareeBtnEl = document.getElementById('saree-gallery-btn');
+        if (sareeBtnEl && extraSareeFiles.length > 0) {
+           sareeBtnEl.style.display = 'inline-block';
+           let sareeData = `JSON.parse(decodeURIComponent('${encodeURIComponent(JSON.stringify(extraSareeFiles))}'))`;
+           sareeBtnEl.setAttribute('onclick', `openModal('saree', 'Saree Pre-Pleating Gallery', true, 'jpg', ${sareeData})`);
+        }
+
       } catch (error) {
         console.warn("Using fallback gallery data due to API limits or missing folders.");
         renderGallery(fallbackClients);
@@ -906,7 +941,7 @@
       clientsData.forEach(client => {
         let btnHTML = '';
         
-        // extraImages is now an array of exact files
+        // extraImages is now an array of exact paths
         const hasExtras = Array.isArray(client.extraImages) ? client.extraImages.length > 0 : client.extraImages > 0;
         
         if(hasExtras) {
@@ -947,14 +982,14 @@
     const modalGallery = document.getElementById('modal-gallery-grid');
 
     function openModal(clientId, clientName, isDynamicArray, ext, extraData) {
-      modalTitle.textContent = clientName + "'s Lookbook";
+      modalTitle.textContent = clientName + (clientId !== 'saree' ? "'s Lookbook" : "");
       modalGallery.innerHTML = ''; 
       
       if(isDynamicArray) {
-         // extraData is an array of exact filenames from GitHub
-         extraData.forEach((filename, i) => {
+         // extraData is an array of exact paths from GitHub (e.g. 'extra/swetha_1.jpg' or 'saree/1.jpg')
+         extraData.forEach((path, i) => {
             modalGallery.innerHTML += `
-              <img src="images/extra/${filename}" alt="${clientName} extra photo ${i+1}" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iNDAwIiB2aWV3Qm94PSIwIDAgNDAwIDQwMCI+PHJlY3Qgd2lkdGg9IjQwMCIgaGVpZ2h0PSI0MDAiIGZpbGw9IiNlY2QwOWYiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjAiIGZpbGw9IiMxYzE0MTAiIGR5PSIuM2VtIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5NaXNzaW5nIEltYWdlPC90ZXh0Pjwvc3ZnPg=='" loading="lazy" />
+              <img src="images/${path}" alt="${clientName} photo ${i+1}" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iNDAwIiB2aWV3Qm94PSIwIDAgNDAwIDQwMCI+PHJlY3Qgd2lkdGg9IjQwMCIgaGVpZ2h0PSI0MDAiIGZpbGw9IiNlY2QwOWYiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjAiIGZpbGw9IiMxYzE0MTAiIGR5PSIuM2VtIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5NaXNzaW5nIEltYWdlPC90ZXh0Pjwvc3ZnPg=='" loading="lazy" />
             `;
          });
       } else {
